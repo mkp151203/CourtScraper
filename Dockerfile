@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y \
     libfreetype6-dev \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+WORKDIR /app/backend
 COPY . /app
 
 RUN pip install --upgrade pip setuptools wheel
