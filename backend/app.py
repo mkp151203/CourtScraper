@@ -613,11 +613,13 @@ def download_pdf(pdf_id):
         # First, try to serve from memory cache (for Render deployment)
         if pdf_id in pdf_cache:
             pdf_data = pdf_cache[pdf_id]
+            print(f"✓ Serving PDF from MEMORY CACHE: {pdf_id} ({len(pdf_data['content'])} bytes)")
             return Response(
                 pdf_data['content'],
                 mimetype='application/pdf',
                 headers={
-                    'Content-Disposition': f'inline; filename="{pdf_data["filename"]}"'
+                    'Content-Disposition': f'inline; filename="{pdf_data["filename"]}"',
+                    'X-PDF-Source': 'memory-cache'  # Custom header to identify source
                 }
             )
         
@@ -627,21 +629,23 @@ def download_pdf(pdf_id):
         # Try to find file with this pdf_id in the name
         pdf_files = glob.glob(os.path.join(backend_downloads_dir, f"*{pdf_id}*.pdf"))
         if pdf_files:
-            return send_file(pdf_files[0], mimetype='application/pdf')
+            print(f"✓ Serving PDF from DISK: {pdf_files[0]}")
+            return send_file(pdf_files[0], mimetype='application/pdf', 
+                           extra_headers={'X-PDF-Source': 'disk'})
         
         # If not found anywhere
+        print(f"✗ PDF not found: {pdf_id}")
+        print(f"   - Memory cache keys: {list(pdf_cache.keys())[:5]}...")
+        print(f"   - Disk files: {os.listdir(backend_downloads_dir) if os.path.exists(backend_downloads_dir) else 'directory not found'}")
         return jsonify({
             'success': False,
             'error': 'PDF file not found. It may have been cleaned up.'
         }), 404
 
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-    except Exception as e:
+        print(f"✗ Error serving PDF: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'error': str(e)
@@ -686,14 +690,29 @@ def get_history():
             'error': str(e)
         }), 500
 
-@app.route('/api/cleanup-downloads', methods=['POST'])
-def cleanup_downloads_endpoint():
-    """Clean up all downloaded PDF files"""
+@app.route('/api/debug/cache-status', methods=['GET'])
+def cache_status():
+    """Debug endpoint to check PDF cache status"""
     try:
-        cleanup_downloads()
+        backend_downloads_dir = os.path.join(os.path.dirname(__file__), 'downloads', 'orders')
+        disk_files = []
+        if os.path.exists(backend_downloads_dir):
+            disk_files = os.listdir(backend_downloads_dir)
+        
         return jsonify({
             'success': True,
-            'message': 'Downloads cleaned up successfully'
+            'cache_info': {
+                'memory_cache': {
+                    'count': len(pdf_cache),
+                    'pdf_ids': list(pdf_cache.keys()),
+                    'total_size_bytes': sum(len(pdf['content']) for pdf in pdf_cache.values())
+                },
+                'disk_storage': {
+                    'count': len(disk_files),
+                    'files': disk_files
+                },
+                'current_session': current_search_session
+            }
         })
     except Exception as e:
         return jsonify({
