@@ -52,7 +52,7 @@ webapp/
 
 1. **Navigate to the webapp directory**
    ```powershell
-   cd d:\PAPERS\application\assign\webapp
+   cd CourtScraper
    ```
 
 2. **Install dependencies**
@@ -81,7 +81,7 @@ webapp/
 ### Searching High Court Cases
 
 1. Select **High Court** tab
-2. Choose a High Court from the dropdown
+2. Choose a High Court from the dropdown (e.g. Delhi Highcourt)
 3. Select the Case Type (e.g., W.P.(C), Civil Appeal)
 4. Enter Case Number (e.g., 16516)
 5. Enter Year (e.g., 2022)
@@ -92,10 +92,10 @@ webapp/
 ### Searching District Court Cases
 
 1. Select **District Court** tab
-2. Choose State from dropdown
-3. Select District
-4. Choose Court Complex
-5. Select Case Type
+2. Choose State from dropdown (e.g. Maharashtra)
+3. Select District (e.g. Mumbai City Civil Court)
+4. Choose Court Complex (e.g. Mumbai City Sessions Court
+5. Select Case Type (CRI APPEAL)
 6. Enter Case Number (e.g., 100591)
 7. Enter Year (e.g., 2016)
 8. Click **Search Case**
