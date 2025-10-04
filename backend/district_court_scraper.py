@@ -714,21 +714,18 @@ class DistrictCourtsScraper:
             traceback.print_exc()
             return {}
     
-    def download_order_pdf(self, pdf_link: str, save_dir: str = None) -> Optional[str]:
-        """Download order/judgment PDF and return local file path"""
+    def download_order_pdf(self, pdf_link: str, pdf_cache=None) -> Optional[Dict]:
+        """Download order/judgment PDF and cache in memory or save to disk.
+        
+        Args:
+            pdf_link: The PDF link from the order
+            pdf_cache: Optional dict to store PDFs in memory (for Render deployment)
+            
+        Returns:
+            Dict with pdf_id and pdf_url if successful, None otherwise
+        """
         try:
             print(f"DEBUG: Downloading PDF from link: {pdf_link}")
-            
-            # Default save directory: webapp/backend/downloads/orders (next to this file)
-            if not save_dir:
-                abs_save_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloads', 'orders')
-            else:
-                # If provided, interpret as relative to project root
-                project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-                abs_save_dir = os.path.join(project_root, save_dir)
-            
-            # Create directory if it doesn't exist
-            os.makedirs(abs_save_dir, exist_ok=True)
             
             # Extract the path from onclick="displayPdf('...')"
             match = re.search(r"displayPdf\('([^']+)'\)", pdf_link)
@@ -834,22 +831,41 @@ class DistrictCourtsScraper:
                     # Clean filename
                     filename = re.sub(r'[^\w\-\.]', '_', original_filename)
                 else:
-                    # Create a unique filename
+                    # Create a unique filename based on link hash and timestamp
                     hash_obj = hashlib.md5(pdf_link.encode())
                     filename = f"order_{hash_obj.hexdigest()[:12]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
                 
                 print(f"DEBUG: Saving as: {filename}")
-                filepath = os.path.join(abs_save_dir, filename)
                 
-                # Save PDF
-                with open(filepath, 'wb') as f:
-                    f.write(response.content)
+                # Generate unique PDF ID
+                pdf_id = f"{hashlib.md5((pdf_link + str(datetime.now().timestamp())).encode()).hexdigest()}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
                 
-                print(f"DEBUG: PDF saved to {filepath} ({len(response.content)} bytes)")
+                # Cache PDF in memory if cache is provided (for Render deployment)
+                if pdf_cache is not None:
+                    pdf_cache[pdf_id] = {
+                        'content': response.content,
+                        'filename': filename,
+                        'timestamp': datetime.now().timestamp()
+                    }
+                    print(f"DEBUG: Cached PDF in memory with ID: {pdf_id}")
                 
-                # Return path relative to backend so the Flask endpoint can serve it
-                rel_path = os.path.join('downloads', 'orders', filename).replace('\\', '/')
-                return rel_path
+                # Also try to save to disk for local development (optional fallback)
+                try:
+                    abs_save_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloads', 'orders')
+                    os.makedirs(abs_save_dir, exist_ok=True)
+                    filepath = os.path.join(abs_save_dir, filename)
+                    
+                    with open(filepath, 'wb') as f:
+                        f.write(response.content)
+                    print(f"DEBUG: Also saved to disk: {filepath} ({len(response.content)} bytes)")
+                except Exception as disk_err:
+                    print(f"DEBUG: Could not save to disk (OK for Render): {disk_err}")
+                
+                # Return PDF info dict
+                return {
+                    'pdf_id': pdf_id,
+                    'pdf_url': f"/api/download-pdf/{pdf_id}"
+                }
             
             print(f"DEBUG: Failed to download PDF - status {response.status_code}")
             return None
@@ -859,8 +875,13 @@ class DistrictCourtsScraper:
             traceback.print_exc()
             return None
     
-    def download_all_orders(self, case_data: Dict, save_dir: Optional[str] = None) -> Dict:
-        """Download all order PDFs and update case_data with local paths"""
+    def download_all_orders(self, case_data: Dict, pdf_cache=None) -> Dict:
+        """Download all order PDFs and cache in memory or save to disk.
+        
+        Args:
+            case_data: The case data dictionary
+            pdf_cache: Optional dict to store PDFs in memory (for Render deployment)
+        """
         if 'orders' not in case_data:
             print("DEBUG: No orders found in case_data")
             return case_data
@@ -870,10 +891,11 @@ class DistrictCourtsScraper:
         for order in case_data['orders']:
             if order.get('pdf_link'):
                 print(f"DEBUG: Downloading order #{order['order_number']}...")
-                local_path = self.download_order_pdf(order['pdf_link'], save_dir)
-                if local_path:
-                    order['local_pdf_path'] = local_path
-                    print(f"DEBUG: ✓ Saved to {local_path}")
+                pdf_info = self.download_order_pdf(order['pdf_link'], pdf_cache)
+                if pdf_info:
+                    order['pdf_id'] = pdf_info['pdf_id']
+                    order['pdf_url'] = pdf_info['pdf_url']
+                    print(f"DEBUG: ✓ Cached PDF: {pdf_info['pdf_id']}")
                 else:
                     print(f"DEBUG: ✗ Failed to download order #{order['order_number']}")
             else:

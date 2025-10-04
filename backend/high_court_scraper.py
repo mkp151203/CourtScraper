@@ -308,40 +308,19 @@ class HCServicesCompleteScraper:
         except Exception as e:
             return {}
     
-    def download_order_pdf(self, view_link: str, save_dir: Optional[str] = None) -> Optional[str]:
-        """Download order/judgment PDF and return local file path.
-
-        By default saves into the webapp backend downloads folder so the Flask app
-        can serve the file without relying on remote viewer sessions.
-        Returns a backend-relative path like 'downloads/orders/<filename>.pdf' on success.
+    def download_order_pdf(self, view_link: str, pdf_cache=None) -> Optional[Dict]:
+        """Download order/judgment PDF and return PDF info with in-memory storage.
+        
+        Args:
+            view_link: The PDF URL to download
+            pdf_cache: Optional dict to store PDF in memory (for Render deployment)
+        
+        Returns:
+            Dict with pdf_id and pdf_url, or None if download fails
         """
         try:
-            import os
-            from datetime import datetime
             import hashlib
-
-            # Default backend downloads location: prefer the local backend downloads
-            # folder next to this scraper (i.e. CourtScraper/backend/downloads/orders).
-            # Fall back to the older webapp/backend/downloads/orders path if needed.
-            scraper_dir = os.path.dirname(os.path.abspath(__file__))
-
-            if save_dir is None:
-                primary_dir = os.path.join(scraper_dir, 'downloads', 'orders')
-                # fallback to project_root/webapp/backend/downloads/orders
-                project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-                fallback_dir = os.path.join(project_root, 'webapp', 'backend', 'downloads', 'orders')
-
-                # Prefer primary_dir (next to this file). If it doesn't exist, we'll still
-                # create it. Use fallback only if primary cannot be created for some reason.
-                abs_save_dir = primary_dir
-                rel_save_dir = os.path.join('downloads', 'orders')
-            else:
-                project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-                abs_save_dir = os.path.join(project_root, save_dir)
-                rel_save_dir = save_dir
-
-            # Create directory if it doesn't exist
-            os.makedirs(abs_save_dir, exist_ok=True)
+            from datetime import datetime
 
             # Construct full URL
             url = f"{self.base_url}{view_link}"
@@ -350,27 +329,51 @@ class HCServicesCompleteScraper:
             response = self.session.get(url, timeout=30)
 
             if response.status_code == 200:
-                # Create a unique filename
+                # Create a unique PDF ID
                 hash_obj = hashlib.md5(view_link.encode())
-                filename = f"order_{hash_obj.hexdigest()[:12]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-                filepath = os.path.join(abs_save_dir, filename)
-
-                # Save PDF
-                with open(filepath, 'wb') as f:
-                    f.write(response.content)
-
-                # Return backend-relative path for use by the webapp (e.g. '/api/download-pdf/<path>')
-                return os.path.join(rel_save_dir, filename)
+                pdf_id = f"{hash_obj.hexdigest()[:12]}_{int(datetime.now().timestamp())}"
+                filename = f"order_{pdf_id}.pdf"
+                
+                # Store in memory cache if provided (for Render)
+                if pdf_cache is not None:
+                    pdf_cache[pdf_id] = {
+                        'content': response.content,
+                        'filename': filename,
+                        'timestamp': datetime.now().timestamp()
+                    }
+                    print(f"Stored PDF in memory cache: {pdf_id}")
+                
+                # Also save to disk for local development
+                try:
+                    import os
+                    scraper_dir = os.path.dirname(os.path.abspath(__file__))
+                    abs_save_dir = os.path.join(scraper_dir, 'downloads', 'orders')
+                    os.makedirs(abs_save_dir, exist_ok=True)
+                    
+                    filepath = os.path.join(abs_save_dir, filename)
+                    with open(filepath, 'wb') as f:
+                        f.write(response.content)
+                    print(f"Saved PDF to disk: {filename}")
+                except Exception as disk_error:
+                    # Disk save failed (expected on Render), but memory cache should work
+                    print(f"Disk save failed (expected on Render): {disk_error}")
+                
+                return {
+                    'pdf_id': pdf_id,
+                    'pdf_url': f"/api/download-pdf/{pdf_id}"
+                }
 
             return None
         except Exception as e:
             print(f"Error downloading PDF: {e}")
             return None
     
-    def download_all_orders(self, case_data: Dict, save_dir: Optional[str] = None) -> Dict:
-        """Download all order PDFs and update case_data with local paths.
-
-        Uses the backend downloads folder by default (same behavior as download_order_pdf).
+    def download_all_orders(self, case_data: Dict, pdf_cache=None) -> Dict:
+        """Download all order PDFs and update case_data with PDF info.
+        
+        Args:
+            case_data: The case data dictionary
+            pdf_cache: Optional dict to store PDFs in memory (for Render deployment)
         """
         if 'orders' not in case_data:
             return case_data
@@ -379,13 +382,14 @@ class HCServicesCompleteScraper:
             if order.get('view_link'):
                 try:
                     print(f"Downloading order #{order.get('order_number', '?')}...")
-                    local_path = self.download_order_pdf(order['view_link'], save_dir)
-                    if local_path:
-                        order['local_pdf_path'] = local_path
-                        print(f"✓ Saved to {local_path}")
+                    pdf_info = self.download_order_pdf(order['view_link'], pdf_cache)
+                    if pdf_info:
+                        order['pdf_id'] = pdf_info['pdf_id']
+                        order['pdf_url'] = pdf_info['pdf_url']
+                        print(f"✓ Cached PDF: {pdf_info['pdf_id']}")
                     else:
                         print(f"✗ Failed to download order #{order.get('order_number', '?')}")
-                except Exception:
-                    print(f"✗ Exception while downloading order #{order.get('order_number', '?')}")
+                except Exception as e:
+                    print(f"✗ Exception while downloading order #{order.get('order_number', '?')}: {e}")
 
         return case_data

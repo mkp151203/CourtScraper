@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file, render_template
+from flask import Flask, request, jsonify, send_file, render_template, Response
 from flask_cors import CORS
 import os
 import json
@@ -8,6 +8,8 @@ from high_court_scraper import HCServicesCompleteScraper
 from district_court_scraper import DistrictCourtsScraper
 import uuid
 import glob
+import time
+from io import BytesIO
 
 app = Flask(__name__, static_folder='../frontend', template_folder='../frontend')
 CORS(app)
@@ -16,20 +18,91 @@ CORS(app)
 # This is critical: captcha must be verified in the same session it was fetched
 active_sessions = {}
 
-def cleanup_downloads():
-    """Delete all PDF files in the downloads/orders directory"""
+# In-memory PDF storage for Render deployment
+# Structure: {pdf_id: {'content': bytes, 'filename': str, 'timestamp': float}}
+pdf_cache = {}
+
+# Track current active search session and its PDFs
+current_search_session = {
+    'session_id': None,
+    'pdf_ids': [],
+    'timestamp': None
+}
+
+def cleanup_downloads(exclude_files=None):
+    """Delete PDF files in the downloads/orders directory (for local development)"""
     try:
         downloads_dir = os.path.join(os.path.dirname(__file__), 'downloads', 'orders')
         if os.path.exists(downloads_dir):
             pdf_files = glob.glob(os.path.join(downloads_dir, '*.pdf'))
+            exclude_set = set(exclude_files) if exclude_files else set()
+            
             for pdf_file in pdf_files:
-                try:
-                    os.remove(pdf_file)
-                    print(f"Deleted: {os.path.basename(pdf_file)}")
-                except Exception as e:
-                    print(f"Failed to delete {pdf_file}: {e}")
+                if pdf_file not in exclude_set:
+                    try:
+                        os.remove(pdf_file)
+                        print(f"Deleted: {os.path.basename(pdf_file)}")
+                    except Exception as e:
+                        print(f"Failed to delete {pdf_file}: {e}")
     except Exception as e:
         print(f"Error during cleanup: {e}")
+
+def cleanup_old_session():
+    """Clean up PDFs from the previous search session"""
+    global current_search_session, pdf_cache
+    
+    if current_search_session['pdf_ids']:
+        print(f"Cleaning up old session PDFs: {len(current_search_session['pdf_ids'])} PDFs")
+        
+        for pdf_id in current_search_session['pdf_ids']:
+            if pdf_id in pdf_cache:
+                del pdf_cache[pdf_id]
+                print(f"Deleted PDF from cache: {pdf_id}")
+        
+        # Also clean disk files if they exist (for local development)
+        downloads_dir = os.path.join(os.path.dirname(__file__), 'downloads', 'orders')
+        if os.path.exists(downloads_dir):
+            for pdf_id in current_search_session['pdf_ids']:
+                # Try to find and delete file with this ID in name
+                for pdf_file in glob.glob(os.path.join(downloads_dir, f"*{pdf_id}*.pdf")):
+                    try:
+                        os.remove(pdf_file)
+                        print(f"Deleted disk file: {os.path.basename(pdf_file)}")
+                    except Exception:
+                        pass
+    
+    # Reset session
+    current_search_session = {
+        'session_id': None,
+        'pdf_ids': [],
+        'timestamp': None
+    }
+
+def register_search_session(case_data):
+    """Register a new search session and track its PDFs"""
+    global current_search_session
+    
+    # Clean up old session first
+    cleanup_old_session()
+    
+    # Create new session
+    session_id = str(uuid.uuid4())
+    pdf_ids = []
+    
+    # Extract PDF IDs from case_data
+    if 'orders' in case_data:
+        for order in case_data.get('orders', []):
+            if 'pdf_id' in order:
+                pdf_ids.append(order['pdf_id'])
+    
+    current_search_session = {
+        'session_id': session_id,
+        'pdf_ids': pdf_ids,
+        'timestamp': time.time()
+    }
+    
+    print(f"New search session registered: {session_id} with {len(pdf_ids)} PDFs")
+    return session_id
 
 # Clean up downloads on server startup
 cleanup_downloads()
@@ -240,12 +313,16 @@ def verify_high_court_captcha():
         if case_history_html:
             case_data = scraper.parse_case_history(case_history_html)
             
-            # Download all order PDFs
+            # Download all order PDFs (pass global pdf_cache for in-memory storage)
             if case_data.get('orders'):
                 print(f"Downloading {len(case_data['orders'])} order PDFs...")
-                case_data = scraper.download_all_orders(case_data)
+                case_data = scraper.download_all_orders(case_data, pdf_cache)
+                
+            # Register this search session and cleanup old files
+            search_session_id = register_search_session(case_data)
         else:
             case_data = {'raw_search_result': search_result}
+            search_session_id = None
         
         # Save to database
         query_id = data.get('query_id')
@@ -254,7 +331,8 @@ def verify_high_court_captcha():
         
         return jsonify({
             'success': True,
-            'case_data': case_data
+            'case_data': case_data,
+            'search_session_id': search_session_id
         })
         
     except Exception as e:
@@ -505,8 +583,11 @@ def verify_district_captcha():
                 'error': 'Case not found or invalid captcha'
             }), 400
         
-        # Download all order PDFs
-        case_data = scraper.download_all_orders(case_data)
+        # Download all order PDFs (pass global pdf_cache for in-memory storage)
+        case_data = scraper.download_all_orders(case_data, pdf_cache)
+        
+        # Register this search session and cleanup old files
+        search_session_id = register_search_session(case_data)
         
         # Save to database
         query_id = data.get('query_id')
@@ -515,7 +596,8 @@ def verify_district_captcha():
         
         return jsonify({
             'success': True,
-            'case_data': case_data
+            'case_data': case_data,
+            'search_session_id': search_session_id
         })
         
     except Exception as e:
@@ -524,48 +606,40 @@ def verify_district_captcha():
             'error': str(e)
         }), 500
 
-@app.route('/api/download-pdf/<path:filename>', methods=['GET'])
-def download_pdf(filename):
-    """Serve downloaded PDF files"""
+@app.route('/api/download-pdf/<pdf_id>', methods=['GET'])
+def download_pdf(pdf_id):
+    """Serve PDF files from memory cache (works on Render) or disk (local development)"""
     try:
-        # Construct the full path to the PDF file inside backend/downloads/orders
+        # First, try to serve from memory cache (for Render deployment)
+        if pdf_id in pdf_cache:
+            pdf_data = pdf_cache[pdf_id]
+            return Response(
+                pdf_data['content'],
+                mimetype='application/pdf',
+                headers={
+                    'Content-Disposition': f'inline; filename="{pdf_data["filename"]}"'
+                }
+            )
+        
+        # Fallback to disk for local development
         backend_downloads_dir = os.path.join(os.path.dirname(__file__), 'downloads', 'orders')
-        abs_downloads_dir = os.path.abspath(backend_downloads_dir)
+        
+        # Try to find file with this pdf_id in the name
+        pdf_files = glob.glob(os.path.join(backend_downloads_dir, f"*{pdf_id}*.pdf"))
+        if pdf_files:
+            return send_file(pdf_files[0], mimetype='application/pdf')
+        
+        # If not found anywhere
+        return jsonify({
+            'success': False,
+            'error': 'PDF file not found. It may have been cleaned up.'
+        }), 404
 
-        # Normalize incoming filename: allow callers to pass 'downloads/orders/<file>' or just '<file>'
-        normalized_filename = filename
-        # Remove leading 'downloads/' if present (handle both / and \\ separators)
-        if normalized_filename.startswith('downloads' + os.sep) or normalized_filename.startswith('downloads/'):
-            # strip the first path segment
-            parts = normalized_filename.split(os.sep) if os.sep in normalized_filename else normalized_filename.split('/')
-            # drop the leading 'downloads' segment
-            normalized_filename = os.path.join(*parts[1:]) if len(parts) > 1 else ''
-
-        # If someone passed 'downloads/orders/<file>' also strip the leading 'orders' part
-        if normalized_filename.startswith('orders' + os.sep) or normalized_filename.startswith('orders/'):
-            parts = normalized_filename.split(os.sep) if os.sep in normalized_filename else normalized_filename.split('/')
-            normalized_filename = os.path.join(*parts[1:]) if len(parts) > 1 else ''
-
-        # Prevent directory traversal by normalizing the requested path
-        requested = os.path.normpath(os.path.join(abs_downloads_dir, normalized_filename))
-        abs_pdf_path = requested
-
-        # Security check: ensure the resolved path is within the backend downloads directory
-        if not (abs_pdf_path == abs_downloads_dir or abs_pdf_path.startswith(abs_downloads_dir + os.sep)):
-            return jsonify({
-                'success': False,
-                'error': 'Invalid file path'
-            }), 403
-
-        # Check if file exists
-        if not os.path.exists(abs_pdf_path):
-            return jsonify({
-                'success': False,
-                'error': 'PDF file not found'
-            }), 404
-
-        # Serve the PDF file
-        return send_file(abs_pdf_path, mimetype='application/pdf')
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
     except Exception as e:
         return jsonify({
