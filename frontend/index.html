@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Indian Court Case Scraper</title>
     <style>
         * {
@@ -953,9 +956,32 @@
                         orderHtml += `<div style="margin-top: 5px;">📋 Details: ${order.details}</div>`;
                     }
                     
-                    // Add view link - check for local_pdf_path first, then fallback to external links
-                    if (order.local_pdf_path) {
-                        // Use the locally downloaded PDF
+                    // Add view link - check for pdf_url (new in-memory cache) or pdf_id first, then fallback to external links
+                    if (order.pdf_url) {
+                        // Use the PDF URL from in-memory cache (works on Render)
+                        orderHtml += `
+                            <div style="margin-top: 10px;">
+                                <a href="${order.pdf_url}" target="_blank" 
+                                   style="display: inline-block; padding: 8px 16px; background: #7c3aed; color: white; 
+                                          text-decoration: none; border-radius: 4px; font-weight: bold;">
+                                    📥 View Order/Judgment (Downloaded)
+                                </a>
+                            </div>
+                        `;
+                    } else if (order.pdf_id) {
+                        // Fallback: construct URL from pdf_id
+                        const pdfUrl = `/api/download-pdf/${order.pdf_id}`;
+                        orderHtml += `
+                            <div style="margin-top: 10px;">
+                                <a href="${pdfUrl}" target="_blank" 
+                                   style="display: inline-block; padding: 8px 16px; background: #7c3aed; color: white; 
+                                          text-decoration: none; border-radius: 4px; font-weight: bold;">
+                                    📥 View Order/Judgment (Downloaded)
+                                </a>
+                            </div>
+                        `;
+                    } else if (order.local_pdf_path) {
+                        // Legacy support for old disk-based downloads
                         const pdfUrl = `/api/download-pdf/${order.local_pdf_path}`;
                         orderHtml += `
                             <div style="margin-top: 10px;">
@@ -1094,44 +1120,6 @@
         function hideResults() {
             document.getElementById('results-container').classList.add('hidden');
         }
-
-        // Temporary Downloads Cleanup
-        (function() {
-            function cleanupDownloads() {
-                try {
-                    const url = '/api/cleanup-downloads';
-                    const data = JSON.stringify({});
-                    
-                    if (navigator.sendBeacon) {
-                        navigator.sendBeacon(url, data);
-                    } else {
-                        fetch(url, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: data,
-                            keepalive: true
-                        }).catch(() => {});
-                    }
-                } catch (error) {
-                    console.log('Cleanup failed:', error);
-                }
-            }
-
-            // Clean up on page unload (refresh, close, navigate away)
-            window.addEventListener('beforeunload', cleanupDownloads);
-            window.addEventListener('unload', cleanupDownloads);
-            
-            // Also clean up when visibility changes
-            document.addEventListener('visibilitychange', function() {
-                if (document.visibilityState === 'hidden') {
-                    cleanupDownloads();
-                }
-            });
-
-            console.log('Temporary downloads cleanup initialized');
-        })();
     </script>
 </body>
 </html>
