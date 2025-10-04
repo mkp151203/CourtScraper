@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Indian Court Case Scraper</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        select, input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .captcha-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .captcha-image {
+            max-width: 300px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .result-section {
+            margin-top: 30px;
+        }
+
+        .result-card {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+        }
+
+        .result-card h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        .result-item {
+            display: flex;
+            padding: 10px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .result-item:last-child {
+            border-bottom: none;
+        }
+
+        .result-label {
+            font-weight: 600;
+            width: 200px;
+            color: #555;
+        }
+
+        .result-value {
+            flex: 1;
+            color: #333;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .alert-error {
+            background: #fee;
+            color: #c00;
+            border: 1px solid #fcc;
+        }
+
+        .alert-success {
+            background: #efe;
+            color: #0a0;
+            border: 1px solid #cfc;
+        }
+
+        .court-type-selector {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .court-type-btn {
+            flex: 1;
+            padding: 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+
+        .court-type-btn:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+        }
+
+        .court-type-btn.active {
+            border-color: #667eea;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .court-type-btn h3 {
+            margin-bottom: 5px;
+        }
+
+        .order-item {
+            background: white;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .court-type-selector {
+                flex-direction: column;
+            }
+
+            .result-item {
+                flex-direction: column;
+            }
+
+            .result-label {
+                width: 100%;
+                margin-bottom: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏛️ Indian Court Case Scraper</h1>
+            <p>Search High Courts and District Courts across India</p>
+        </div>
+
+        <div class="card">
+            <div class="court-type-selector">
+                <div class="court-type-btn active" onclick="selectCourtType('high-court')">
+                    <h3>High Court</h3>
+                    <p>Search all High Courts</p>
+                </div>
+                <div class="court-type-btn" onclick="selectCourtType('district-court')">
+                    <h3>District Court</h3>
+                    <p>Search District & Taluka Courts</p>
+                </div>
+            </div>
+
+            <div id="alert-container"></div>
+
+            <!-- High Court Form -->
+            <div id="high-court-form">
+                <div class="form-group">
+                    <label for="hc-court">Select High Court</label>
+                    <select id="hc-court" onchange="onHighCourtChange()">
+                        <option value="">Loading courts...</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="hc-case-type">Case Type</label>
+                    <select id="hc-case-type">
+                        <option value="">Select court first</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="hc-case-number">Case Number</label>
+                    <input type="text" id="hc-case-number" placeholder="e.g., 16516">
+                </div>
+
+                <div class="form-group">
+                    <label for="hc-year">Year</label>
+                    <input type="text" id="hc-year" placeholder="e.g., 2022">
+                </div>
+
+                <button class="btn" onclick="searchHighCourt()">Search Case</button>
+            </div>
+
+            <!-- District Court Form -->
+            <div id="district-court-form" class="hidden">
+                <div class="form-group">
+                    <label for="dc-state">Select State</label>
+                    <select id="dc-state" onchange="onStateChange()">
+                        <option value="">Select state</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="dc-district">Select District</label>
+                    <select id="dc-district" onchange="onDistrictChange()">
+                        <option value="">Select state first</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="dc-court-complex">Select Court Complex</label>
+                    <select id="dc-court-complex" onchange="onCourtComplexChange()">
+                        <option value="">Select district first</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="dc-case-type">Case Type</label>
+                    <select id="dc-case-type">
+                        <option value="">Select court complex first</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="dc-case-number">Case Number</label>
+                    <input type="text" id="dc-case-number" placeholder="e.g., 100591">
+                </div>
+
+                <div class="form-group">
+                    <label for="dc-year">Year</label>
+                    <input type="text" id="dc-year" placeholder="e.g., 2016">
+                </div>
+
+                <button class="btn" onclick="searchDistrictCourt()">Search Case</button>
+            </div>
+        </div>
+
+        <!-- Captcha Modal -->
+        <div id="captcha-modal" class="card hidden">
+            <h2 style="margin-bottom: 20px;">Solve Captcha</h2>
+            <div class="captcha-container">
+                <img id="captcha-image" class="captcha-image" src="" alt="Captcha">
+            </div>
+            <div class="form-group">
+                <label for="captcha-input">Enter Captcha Text</label>
+                <input type="text" id="captcha-input" placeholder="Enter the text shown above">
+            </div>
+            <button class="btn" onclick="submitCaptcha()">Submit</button>
+        </div>
+
+        <!-- Loading -->
+        <div id="loading-indicator" class="card hidden">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p style="margin-top: 15px;">Loading...</p>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div id="results-container" class="hidden">
+            <div class="card">
+                <h2 style="margin-bottom: 20px;">Case Details</h2>
+                <div id="results-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentCourtType = 'high-court';
+        let currentQueryData = {};
+        let highCourts = [];
+        let states = {};
+
+        // Initialize
+        window.onload = function() {
+            loadHighCourts();
+            loadStates();
+        };
+
+        function selectCourtType(type) {
+            currentCourtType = type;
+            
+            // Update button styles
+            document.querySelectorAll('.court-type-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.closest('.court-type-btn').classList.add('active');
+            
+            // Show/hide forms
+            document.getElementById('high-court-form').classList.toggle('hidden', type !== 'high-court');
+            document.getElementById('district-court-form').classList.toggle('hidden', type !== 'district-court');
+            
+            // Hide results
+            hideResults();
+        }
+
+        async function loadHighCourts() {
+            try {
+                const response = await fetch('/api/high-court/courts');
+                const data = await response.json();
+                
+                if (data.success) {
+                    highCourts = data.courts;
+                    const select = document.getElementById('hc-court');
+                    select.innerHTML = '<option value="">Select High Court</option>';
+                    
+                    data.courts.forEach(court => {
+                        const option = document.createElement('option');
+                        option.value = JSON.stringify(court);
+                        option.textContent = court.court_name;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                showAlert('Failed to load High Courts', 'error');
+            }
+        }
+
+        async function loadStates() {
+            try {
+                const response = await fetch('/api/district-court/states');
+                const data = await response.json();
+                
+                if (data.success) {
+                    states = data.states;
+                    const select = document.getElementById('dc-state');
+                    select.innerHTML = '<option value="">Select State</option>';
+                    
+                    Object.keys(states).sort().forEach(stateName => {
+                        const option = document.createElement('option');
+                        option.value = states[stateName];
+                        option.textContent = stateName;
+                        option.dataset.name = stateName;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                showAlert('Failed to load states', 'error');
+            }
+        }
+
+        async function onHighCourtChange() {
+            const select = document.getElementById('hc-court');
+            const courtData = JSON.parse(select.value || '{}');
+            
+            if (!courtData.court_code) return;
+            
+            showLoading();
+            
+            try {
+                const response = await fetch('/api/high-court/case-types', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        court_code: courtData.court_code,
+                        state_code: courtData.state_code
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const caseTypeSelect = document.getElementById('hc-case-type');
+                    caseTypeSelect.innerHTML = '<option value="">Select Case Type</option>';
+                    
+                    Object.entries(data.case_types).forEach(([code, name]) => {
+                        const option = document.createElement('option');
+                        option.value = code;
+                        option.textContent = `${name} (${code})`;
+                        caseTypeSelect.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                showAlert('Failed to load case types', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function onStateChange() {
+            const select = document.getElementById('dc-state');
+            const stateCode = select.value;
+            const stateName = select.options[select.selectedIndex].dataset.name;
+            
+            if (!stateCode) return;
+            
+            showLoading();
+            
+            try {
+                const response = await fetch('/api/district-court/districts', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        state_code: stateCode,
+                        state_name: stateName
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const districtSelect = document.getElementById('dc-district');
+                    districtSelect.innerHTML = '<option value="">Select District</option>';
+                    
+                    Object.entries(data.districts).forEach(([name, code]) => {
+                        const option = document.createElement('option');
+                        option.value = code;
+                        option.textContent = name;
+                        option.dataset.name = name;
+                        districtSelect.appendChild(option);
+                    });
+                    
+                    // Reset dependent dropdowns
+                    document.getElementById('dc-court-complex').innerHTML = '<option value="">Select district first</option>';
+                    document.getElementById('dc-case-type').innerHTML = '<option value="">Select court complex first</option>';
+                } else {
+                    showAlert(data.error || 'Failed to load districts', 'error');
+                }
+            } catch (error) {
+                console.error('Error loading districts:', error);
+                showAlert('Failed to load districts: ' + error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function onDistrictChange() {
+            const stateSelect = document.getElementById('dc-state');
+            const districtSelect = document.getElementById('dc-district');
+            
+            const stateCode = stateSelect.value;
+            const districtCode = districtSelect.value;
+            
+            // Get names from the selected options
+            const stateOption = stateSelect.options[stateSelect.selectedIndex];
+            const districtOption = districtSelect.options[districtSelect.selectedIndex];
+            
+            const stateName = stateOption ? stateOption.dataset.name : '';
+            const districtName = districtOption ? districtOption.textContent : '';
+            
+            if (!districtCode || !stateCode) {
+                return;
+            }
+            
+            showLoading();
+            
+            try {
+                const response = await fetch('/api/district-court/court-complexes', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        state_code: stateCode,
+                        state_name: stateName,
+                        district_code: districtCode,
+                        district_name: districtName
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const complexSelect = document.getElementById('dc-court-complex');
+                    complexSelect.innerHTML = '<option value="">Select Court Complex</option>';
+                    
+                    Object.entries(data.court_complexes).forEach(([name, code]) => {
+                        const option = document.createElement('option');
+                        option.value = code;
+                        option.textContent = name;
+                        option.dataset.name = name;
+                        complexSelect.appendChild(option);
+                    });
+                    
+                    // Reset case types
+                    document.getElementById('dc-case-type').innerHTML = '<option value="">Select court complex first</option>';
+                } else {
+                    showAlert(data.error || 'Failed to load court complexes', 'error');
+                }
+            } catch (error) {
+                showAlert('Failed to load court complexes: ' + error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function onCourtComplexChange() {
+            const stateSelect = document.getElementById('dc-state');
+            const districtSelect = document.getElementById('dc-district');
+            const complexSelect = document.getElementById('dc-court-complex');
+            
+            const stateCode = stateSelect.value;
+            const stateName = stateSelect.options[stateSelect.selectedIndex].dataset.name;
+            const districtCode = districtSelect.value;
+            const districtName = districtSelect.options[districtSelect.selectedIndex].dataset.name;
+            const complexCode = complexSelect.value;
+            const complexName = complexSelect.options[complexSelect.selectedIndex].dataset.name;
+            
+            if (!complexCode) return;
+            
+            showLoading();
+            
+            try {
+                const response = await fetch('/api/district-court/case-types', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        state_code: stateCode,
+                        state_name: stateName,
+                        district_code: districtCode,
+                        district_name: districtName,
+                        court_complex_code: complexCode,
+                        court_complex_name: complexName
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const caseTypeSelect = document.getElementById('dc-case-type');
+                    caseTypeSelect.innerHTML = '<option value="">Select Case Type</option>';
+                    
+                    Object.entries(data.case_types).forEach(([name, code]) => {
+                        const option = document.createElement('option');
+                        option.value = code;
+                        option.textContent = name;
+                        caseTypeSelect.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                showAlert('Failed to load case types', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function searchHighCourt() {
+            const select = document.getElementById('hc-court');
+            const courtData = JSON.parse(select.value || '{}');
+            const caseType = document.getElementById('hc-case-type').value;
+            const caseNumber = document.getElementById('hc-case-number').value;
+            const year = document.getElementById('hc-year').value;
+            
+            if (!courtData.court_code || !caseType || !caseNumber || !year) {
+                showAlert('Please fill all fields', 'error');
+                return;
+            }
+            
+            showLoading();
+            
+            currentQueryData = {
+                court_code: courtData.court_code,
+                state_code: courtData.state_code,
+                court_name: courtData.court_name,
+                case_type: caseType,
+                case_number: caseNumber,
+                year: year
+            };
+            
+            try {
+                const response = await fetch('/api/high-court/search', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(currentQueryData)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentQueryData.query_id = data.query_id;
+                    currentQueryData.session_id = data.session_id; // Store session ID
+                    showCaptcha(data.captcha_url);
+                } else {
+                    showAlert(data.error || 'Failed to search', 'error');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function searchDistrictCourt() {
+            const stateSelect = document.getElementById('dc-state');
+            const districtSelect = document.getElementById('dc-district');
+            const complexSelect = document.getElementById('dc-court-complex');
+            const caseType = document.getElementById('dc-case-type').value;
+            const caseNumber = document.getElementById('dc-case-number').value;
+            const year = document.getElementById('dc-year').value;
+            
+            if (!stateSelect.value || !districtSelect.value || !complexSelect.value || !caseType || !caseNumber || !year) {
+                showAlert('Please fill all fields', 'error');
+                return;
+            }
+            
+            showLoading();
+            
+            currentQueryData = {
+                state_code: stateSelect.value,
+                state_name: stateSelect.options[stateSelect.selectedIndex]?.dataset?.name || stateSelect.options[stateSelect.selectedIndex]?.textContent || '',
+                district_code: districtSelect.value,
+                district_name: districtSelect.options[districtSelect.selectedIndex]?.textContent || '',
+                court_complex_code: complexSelect.value,
+                court_complex_name: complexSelect.options[complexSelect.selectedIndex]?.textContent || '',
+                case_type: caseType,
+                case_number: caseNumber,
+                year: year
+            };
+            
+            try {
+                const response = await fetch('/api/district-court/search', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(currentQueryData)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentQueryData.query_id = data.query_id;
+                    currentQueryData.session_id = data.session_id; // Store session ID
+                    showCaptcha(data.captcha_url);
+                } else {
+                    showAlert(data.error || 'Failed to search', 'error');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+
+        function showCaptcha(captchaUrl) {
+            document.getElementById('captcha-image').src = captchaUrl;
+            document.getElementById('captcha-input').value = '';
+            document.getElementById('captcha-modal').classList.remove('hidden');
+        }
+
+        async function submitCaptcha() {
+            const captcha = document.getElementById('captcha-input').value;
+            
+            if (!captcha) {
+                showAlert('Please enter captcha', 'error');
+                return;
+            }
+            
+            showLoading();
+            document.getElementById('captcha-modal').classList.add('hidden');
+            
+            const endpoint = currentCourtType === 'high-court' 
+                ? '/api/high-court/verify-captcha'
+                : '/api/district-court/verify-captcha';
+            
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        ...currentQueryData,
+                        captcha: captcha
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showAlert('Case found successfully!', 'success');
+                    displayResults(data.case_data);
+                } else {
+                    showAlert(data.error || 'Failed to fetch case', 'error');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        function displayResults(caseData) {
+            const container = document.getElementById('results-content');
+            container.innerHTML = '';
+            
+            // Display case details
+            if (caseData.case_details) {
+                const detailsCard = document.createElement('div');
+                detailsCard.className = 'result-card';
+                detailsCard.innerHTML = '<h3>📋 Case Details</h3>';
+                
+                Object.entries(caseData.case_details).forEach(([key, value]) => {
+                    const item = document.createElement('div');
+                    item.className = 'result-item';
+                    item.innerHTML = `
+                        <div class="result-label">${key}:</div>
+                        <div class="result-value">${value}</div>
+                    `;
+                    detailsCard.appendChild(item);
+                });
+                
+                container.appendChild(detailsCard);
+            }
+            
+            // Display case status
+            if (caseData.case_status) {
+                const statusCard = document.createElement('div');
+                statusCard.className = 'result-card';
+                statusCard.innerHTML = '<h3>⚖️ Case Status</h3>';
+                
+                Object.entries(caseData.case_status).forEach(([key, value]) => {
+                    const item = document.createElement('div');
+                    item.className = 'result-item';
+                    item.innerHTML = `
+                        <div class="result-label">${key}:</div>
+                        <div class="result-value">${value}</div>
+                    `;
+                    statusCard.appendChild(item);
+                });
+                
+                container.appendChild(statusCard);
+            }
+            
+            // Display parties
+            if (caseData.parties) {
+                const partiesCard = document.createElement('div');
+                partiesCard.className = 'result-card';
+                partiesCard.innerHTML = '<h3>👥 Parties</h3>';
+                
+                if (caseData.parties.petitioner) {
+                    const item = document.createElement('div');
+                    item.className = 'result-item';
+                    item.innerHTML = `
+                        <div class="result-label">Petitioner:</div>
+                        <div class="result-value">${caseData.parties.petitioner}</div>
+                    `;
+                    partiesCard.appendChild(item);
+                }
+                
+                if (caseData.parties.respondent) {
+                    const item = document.createElement('div');
+                    item.className = 'result-item';
+                    item.innerHTML = `
+                        <div class="result-label">Respondent:</div>
+                        <div class="result-value">${caseData.parties.respondent}</div>
+                    `;
+                    partiesCard.appendChild(item);
+                }
+                
+                if (caseData.parties.petitioners && caseData.parties.petitioners.length > 0) {
+                    const item = document.createElement('div');
+                    item.className = 'result-item';
+                    item.innerHTML = `
+                        <div class="result-label">Petitioners:</div>
+                        <div class="result-value">${caseData.parties.petitioners.map(p => p.name).join(', ')}</div>
+                    `;
+                    partiesCard.appendChild(item);
+                }
+                
+                if (caseData.parties.respondents && caseData.parties.respondents.length > 0) {
+                    const item = document.createElement('div');
+                    item.className = 'result-item';
+                    item.innerHTML = `
+                        <div class="result-label">Respondents:</div>
+                        <div class="result-value">${caseData.parties.respondents.map(p => p.name).join(', ')}</div>
+                    `;
+                    partiesCard.appendChild(item);
+                }
+                
+                container.appendChild(partiesCard);
+            }
+            
+            // Display Acts (for district courts)
+            if (caseData.acts && caseData.acts.length > 0) {
+                const actsCard = document.createElement('div');
+                actsCard.className = 'result-card';
+                actsCard.innerHTML = '<h3>📜 Acts and Sections</h3>';
+                
+                caseData.acts.forEach(act => {
+                    const actDiv = document.createElement('div');
+                    actDiv.className = 'result-item';
+                    actDiv.innerHTML = `
+                        <div class="result-label">${act.act}:</div>
+                        <div class="result-value">Section(s): ${act.sections}</div>
+                    `;
+                    actsCard.appendChild(actDiv);
+                });
+                
+                container.appendChild(actsCard);
+            }
+            
+            // Display subordinate court information (for district courts)
+            if (caseData.subordinate_court) {
+                const subCourtCard = document.createElement('div');
+                subCourtCard.className = 'result-card';
+                subCourtCard.innerHTML = '<h3>🏛️ Subordinate Court Information</h3>';
+                
+                Object.entries(caseData.subordinate_court).forEach(([key, value]) => {
+                    const item = document.createElement('div');
+                    item.className = 'result-item';
+                    item.innerHTML = `
+                        <div class="result-label">${key}:</div>
+                        <div class="result-value">${value}</div>
+                    `;
+                    subCourtCard.appendChild(item);
+                });
+                
+                container.appendChild(subCourtCard);
+            }
+            
+            // Display court info (for high courts)
+            if (caseData.court_info) {
+                const courtCard = document.createElement('div');
+                courtCard.className = 'result-card';
+                courtCard.innerHTML = '<h3>🏛️ Court Information</h3>';
+                
+                Object.entries(caseData.court_info).forEach(([key, value]) => {
+                    const item = document.createElement('div');
+                    item.className = 'result-item';
+                    item.innerHTML = `
+                        <div class="result-label">${key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:</div>
+                        <div class="result-value">${value}</div>
+                    `;
+                    courtCard.appendChild(item);
+                });
+                
+                container.appendChild(courtCard);
+            }
+            
+            // Display orders
+            if (caseData.orders && caseData.orders.length > 0) {
+                const ordersCard = document.createElement('div');
+                ordersCard.className = 'result-card';
+                ordersCard.innerHTML = '<h3>📄 Orders/Judgments</h3>';
+                
+                caseData.orders.forEach(order => {
+                    const orderDiv = document.createElement('div');
+                    orderDiv.className = 'order-item';
+                    
+                    let orderHtml = `
+                        <div style="margin-bottom: 10px; padding: 10px; border-left: 3px solid #7c3aed; background: #f9fafb;">
+                            <div style="font-weight: bold; color: #7c3aed;">Order #${order.order_number}</div>
+                            <div style="margin-top: 5px;">📅 Date: ${order.order_date || order.order_on || 'N/A'}</div>
+                    `;
+                    
+                    if (order.judge) {
+                        orderHtml += `<div style="margin-top: 5px;">👨‍⚖️ Judge: ${order.judge}</div>`;
+                    }
+                    
+                    if (order.details) {
+                        orderHtml += `<div style="margin-top: 5px;">📋 Details: ${order.details}</div>`;
+                    }
+                    
+                    // Add view link - check for local_pdf_path first, then fallback to external links
+                    if (order.local_pdf_path) {
+                        // Use the locally downloaded PDF
+                        const pdfUrl = `/api/download-pdf/${order.local_pdf_path}`;
+                        orderHtml += `
+                            <div style="margin-top: 10px;">
+                                <a href="${pdfUrl}" target="_blank" 
+                                   style="display: inline-block; padding: 8px 16px; background: #7c3aed; color: white; 
+                                          text-decoration: none; border-radius: 4px; font-weight: bold;">
+                                    📥 View Order/Judgment (Downloaded)
+                                </a>
+                            </div>
+                        `;
+                    } else if (order.view_link) {
+                        // Fallback to external High Court link
+                        const baseUrl = 'https://hcservices.ecourts.gov.in/hcservices/';
+                        const fullUrl = baseUrl + order.view_link;
+                        orderHtml += `
+                            <div style="margin-top: 10px;">
+                                <a href="${fullUrl}" target="_blank" 
+                                   style="display: inline-block; padding: 8px 16px; background: #7c3aed; color: white; 
+                                          text-decoration: none; border-radius: 4px; font-weight: bold;">
+                                    📥 View Order/Judgment
+                                </a>
+                            </div>
+                        `;
+                    } else if (order.pdf_link) {
+                        // Fallback to external District Court link
+                        // Parse the displayPdf function call to extract parameters
+                        const match = order.pdf_link.match(/displayPdf\('([^']+)'\)/);
+                        if (match) {
+                            const params = match[1];
+                            // The params are in format: home/display_pdf&filename=...&caseno=...
+                            // We need to convert this to a proper query string
+                            const baseUrl = 'https://services.ecourts.gov.in/ecourtindia_v6/';
+                            
+                            // Extract the path and query parameters
+                            const parts = params.split('&');
+                            if (parts.length > 0) {
+                                const path = parts[0]; // e.g., "home/display_pdf"
+                                const queryParams = parts.slice(1).join('&'); // e.g., "filename=...&caseno=..."
+                                
+                                // Construct the full URL
+                                const fullUrl = `${baseUrl}${path}?${queryParams}`;
+                                
+                                orderHtml += `
+                                    <div style="margin-top: 10px;">
+                                        <a href="${fullUrl}" target="_blank" 
+                                           style="display: inline-block; padding: 8px 16px; background: #7c3aed; color: white; 
+                                                  text-decoration: none; border-radius: 4px; font-weight: bold;">
+                                            📥 View Order/Judgment PDF
+                                        </a>
+                                    </div>
+                                `;
+                            }
+                        }
+                    }
+                    
+                    orderHtml += `</div>`;
+                    orderDiv.innerHTML = orderHtml;
+                    ordersCard.appendChild(orderDiv);
+                });
+                
+                container.appendChild(ordersCard);
+            }
+            
+            // Display hearings
+            if (caseData.hearings && caseData.hearings.length > 0) {
+                const hearingsCard = document.createElement('div');
+                hearingsCard.className = 'result-card';
+                hearingsCard.innerHTML = `
+                    <h3>📅 Hearing History</h3>
+                    <p style="color: #666; font-size: 14px;">Showing last ${Math.min(15, caseData.hearings.length)} hearings</p>
+                `;
+                
+                caseData.hearings.slice(0, 15).forEach((hearing, index) => {
+                    const hearingDiv = document.createElement('div');
+                    hearingDiv.className = 'order-item';
+                    
+                    let hearingHtml = `
+                        <div style="margin-bottom: 10px; padding: 10px; background: ${index % 2 === 0 ? '#f9fafb' : '#ffffff'}; border-left: 2px solid #7c3aed;">
+                    `;
+                    
+                    if (hearing.business_on_date) {
+                        hearingHtml += `<div><strong>📅 Business Date:</strong> ${hearing.business_on_date}</div>`;
+                    }
+                    
+                    if (hearing.hearing_date) {
+                        hearingHtml += `<div><strong>📅 Hearing Date:</strong> ${hearing.hearing_date}</div>`;
+                    }
+                    
+                    if (hearing.purpose) {
+                        hearingHtml += `<div><strong>📋 Purpose:</strong> ${hearing.purpose}</div>`;
+                    }
+                    
+                    if (hearing.judge) {
+                        hearingHtml += `<div><strong>👨‍⚖️ Judge:</strong> ${hearing.judge}</div>`;
+                    }
+                    
+                    hearingHtml += `</div>`;
+                    hearingDiv.innerHTML = hearingHtml;
+                    hearingsCard.appendChild(hearingDiv);
+                });
+                
+                if (caseData.hearings.length > 15) {
+                    const moreDiv = document.createElement('div');
+                    moreDiv.style.cssText = 'text-align: center; margin-top: 10px; color: #7c3aed; font-style: italic;';
+                    moreDiv.textContent = `+ ${caseData.hearings.length - 15} more hearings available`;
+                    hearingsCard.appendChild(moreDiv);
+                }
+                
+                container.appendChild(hearingsCard);
+            }
+            
+            document.getElementById('results-container').classList.remove('hidden');
+        }
+
+        function showAlert(message, type) {
+            const container = document.getElementById('alert-container');
+            container.innerHTML = `
+                <div class="alert alert-${type}">
+                    ${message}
+                </div>
+            `;
+            
+            setTimeout(() => {
+                container.innerHTML = '';
+            }, 5000);
+        }
+
+        function showLoading() {
+            document.getElementById('loading-indicator').classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            document.getElementById('loading-indicator').classList.add('hidden');
+        }
+
+        function hideResults() {
+            document.getElementById('results-container').classList.add('hidden');
+        }
+
+        // Temporary Downloads Cleanup
+        (function() {
+            function cleanupDownloads() {
+                try {
+                    const url = '/api/cleanup-downloads';
+                    const data = JSON.stringify({});
+                    
+                    if (navigator.sendBeacon) {
+                        navigator.sendBeacon(url, data);
+                    } else {
+                        fetch(url, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: data,
+                            keepalive: true
+                        }).catch(() => {});
+                    }
+                } catch (error) {
+                    console.log('Cleanup failed:', error);
+                }
+            }
+
+            // Clean up on page unload (refresh, close, navigate away)
+            window.addEventListener('beforeunload', cleanupDownloads);
+            window.addEventListener('unload', cleanupDownloads);
+            
+            // Also clean up when visibility changes
+            document.addEventListener('visibilitychange', function() {
+                if (document.visibilityState === 'hidden') {
+                    cleanupDownloads();
+                }
+            });
+
+            console.log('Temporary downloads cleanup initialized');
+        })();
+    </script>
+</body>
+</html>
