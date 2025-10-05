@@ -1,9 +1,21 @@
+# Web Framework
 Flask==2.3.3
 flask-cors==4.0.0
+
+# HTTP Requests
 requests==2.31.0
+
+# HTML/XML Parsing
 beautifulsoup4==4.12.2
-Pillow==10.1.0
 lxml==4.9.3
+
+# Image Processing
+Pillow==10.1.0
+
+# PDF Processing
+PyPDF2==3.0.1
+
+# Package Management
 pip
 setuptools
 wheel

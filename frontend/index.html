@@ -267,6 +267,14 @@
                     <h3>District Court</h3>
                     <p>Search District & Taluka Courts</p>
                 </div>
+                <div class="court-type-btn" onclick="selectCourtType('causelist')">
+                    <h3>HC Cause List</h3>
+                    <p>Search High Court Cause Lists</p>
+                </div>
+                <div class="court-type-btn" onclick="selectCourtType('district-causelist')">
+                    <h3>DC Cause List</h3>
+                    <p>Search District Court Cause Lists</p>
+                </div>
             </div>
 
             <div id="alert-container"></div>
@@ -342,6 +350,109 @@
 
                 <button class="btn" onclick="searchDistrictCourt()">Search Case</button>
             </div>
+
+            <!-- Cause List Form -->
+            <div id="causelist-form" class="hidden">
+                <div class="form-group">
+                    <label for="cl-court">Select High Court</label>
+                    <select id="cl-court" onchange="onCauseListCourtChange()">
+                        <option value="">Loading courts...</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="cl-bench">Select Bench/Location (Optional)</label>
+                    <select id="cl-bench">
+                        <option value="">All Benches</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="cl-date">Cause List Date</label>
+                    <input type="date" id="cl-date">
+                </div>
+
+                <div class="form-group">
+                    <label for="cl-search-type">Search Type</label>
+                    <select id="cl-search-type">
+                        <option value="case_number">Case Number</option>
+                        <option value="party_name">Party Name</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="cl-search-term">Search Term</label>
+                    <input type="text" id="cl-search-term" placeholder="e.g., WP/1234/2024 or party name">
+                </div>
+
+                <button class="btn" onclick="searchCauseList()">Search Cause List</button>
+            </div>
+
+            <!-- District Cause List Form -->
+            <div id="district-causelist-form" class="hidden">
+                <div class="form-group">
+                    <label for="dcl-state">Select State</label>
+                    <select id="dcl-state" onchange="onDCLStateChange()">
+                        <option value="">Select state</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="dcl-district">Select District</label>
+                    <select id="dcl-district" onchange="onDCLDistrictChange()">
+                        <option value="">Select state first</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="dcl-court-complex">Select Court Complex</label>
+                    <select id="dcl-court-complex" onchange="onDCLComplexChange()">
+                        <option value="">Select district first</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="dcl-establishment">Select Establishment (Court Type)</label>
+                    <select id="dcl-establishment" onchange="onDCLEstablishmentChange()">
+                        <option value="">Select court complex first</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="dcl-judge">Select Judge/Court Number</label>
+                    <select id="dcl-judge">
+                        <option value="">Select establishment first</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="dcl-date">Cause List Date</label>
+                    <input type="date" id="dcl-date">
+                </div>
+
+                <div class="form-group">
+                    <label for="dcl-case-type">Case Type</label>
+                    <select id="dcl-case-type">
+                        <option value="civ">Civil</option>
+                        <option value="cri">Criminal</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="dcl-search-type">Search Type</label>
+                    <select id="dcl-search-type">
+                        <option value="case_number">Case Number</option>
+                        <option value="party_name">Party Name</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="dcl-search-term">Search Term</label>
+                    <input type="text" id="dcl-search-term" placeholder="e.g., 123/2024 or party name">
+                </div>
+
+                <button class="btn" onclick="searchDistrictCauseList()">Search Cause List</button>
+            </div>
         </div>
 
         <!-- Captcha Modal -->
@@ -361,7 +472,14 @@
         <div id="loading-indicator" class="card hidden">
             <div class="loading">
                 <div class="spinner"></div>
-                <p style="margin-top: 15px;">Loading...</p>
+                <p style="margin-top: 15px;" id="loading-message">Loading...</p>
+                <div id="progress-container" style="margin-top: 15px; display: none;">
+                    <div style="background: #e0e0e0; border-radius: 10px; height: 8px; overflow: hidden;">
+                        <div id="progress-bar" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); height: 100%; width: 0%; transition: width 0.3s;"></div>
+                    </div>
+                    <p id="progress-text" style="margin-top: 10px; font-size: 14px; color: #666;"></p>
+                    <div id="progress-log" style="margin-top: 10px; max-height: 200px; overflow-y: auto; text-align: left; font-size: 12px; color: #888; font-family: monospace; background: #f9fafb; padding: 10px; border-radius: 5px; display: none;"></div>
+                </div>
             </div>
         </div>
 
@@ -377,13 +495,23 @@
     <script>
         let currentCourtType = 'high-court';
         let currentQueryData = {};
+        let causelistSessionId = null; // Store causelist session for PDF downloads
         let highCourts = [];
+        let causeListCourts = [];
         let states = {};
+        let districtCauseListSessionId = null; // Session for dropdown continuity
 
         // Initialize
         window.onload = function() {
             loadHighCourts();
             loadStates();
+            loadCauseListCourts();
+            loadDistrictCauseListStates();
+            
+            // Set today's date as default for causelists
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('cl-date').value = today;
+            document.getElementById('dcl-date').value = today;
         };
 
         function selectCourtType(type) {
@@ -398,6 +526,8 @@
             // Show/hide forms
             document.getElementById('high-court-form').classList.toggle('hidden', type !== 'high-court');
             document.getElementById('district-court-form').classList.toggle('hidden', type !== 'district-court');
+            document.getElementById('causelist-form').classList.toggle('hidden', type !== 'causelist');
+            document.getElementById('district-causelist-form').classList.toggle('hidden', type !== 'district-causelist');
             
             // Hide results
             hideResults();
@@ -445,6 +575,70 @@
                 }
             } catch (error) {
                 showAlert('Failed to load states', 'error');
+            }
+        }
+
+        async function loadCauseListCourts() {
+            try {
+                const response = await fetch('/api/causelist/courts');
+                const data = await response.json();
+                
+                if (data.success) {
+                    causeListCourts = data.courts;
+                    const select = document.getElementById('cl-court');
+                    select.innerHTML = '<option value="">Select High Court</option>';
+                    
+                    data.courts.forEach(court => {
+                        // Skip the "Select Highcourt" placeholder option
+                        if (court.state_code === "0" || court.court_code === "0") {
+                            return;
+                        }
+                        
+                        const option = document.createElement('option');
+                        option.value = JSON.stringify(court);
+                        option.textContent = court.name;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                showAlert('Failed to load courts for cause list', 'error');
+            }
+        }
+
+        async function onCauseListCourtChange() {
+            const select = document.getElementById('cl-court');
+            const courtData = JSON.parse(select.value || '{}');
+            
+            if (!courtData.state_code) return;
+            
+            showLoading();
+            
+            try {
+                const response = await fetch('/api/causelist/benches', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        state_code: courtData.state_code
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const benchSelect = document.getElementById('cl-bench');
+                    benchSelect.innerHTML = '<option value="">All Benches</option>';
+                    
+                    data.benches.forEach(bench => {
+                        const option = document.createElement('option');
+                        option.value = bench.court_code;
+                        option.textContent = bench.name;
+                        benchSelect.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                showAlert('Failed to load benches', 'error');
+            } finally {
+                hideLoading();
             }
         }
 
@@ -737,6 +931,425 @@
             }
         }
 
+        async function searchCauseList() {
+            const select = document.getElementById('cl-court');
+            const courtData = JSON.parse(select.value || '{}');
+            const benchSelect = document.getElementById('cl-bench');
+            const courtCode = benchSelect.value || courtData.state_code; // Use bench or default court code
+            const dateInput = document.getElementById('cl-date').value;
+            const searchType = document.getElementById('cl-search-type').value;
+            const searchTerm = document.getElementById('cl-search-term').value.trim();
+            
+            if (!courtData.state_code || !dateInput || !searchTerm) {
+                showAlert('Please fill all required fields', 'error');
+                return;
+            }
+            
+            // Convert date from YYYY-MM-DD to DD-MM-YYYY
+            const dateParts = dateInput.split('-');
+            const formattedDate = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
+            
+            showLoading();
+            
+            currentQueryData = {
+                state_code: courtData.state_code,
+                court_code: courtCode,
+                court_name: courtData.name,
+                bench_name: benchSelect.options[benchSelect.selectedIndex]?.textContent || 'All Benches',
+                date: formattedDate,
+                search_term: searchTerm,
+                is_party_name: searchType === 'party_name'
+            };
+            
+            try {
+                const response = await fetch('/api/causelist/search', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(currentQueryData)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentQueryData.query_id = data.query_id;
+                    currentQueryData.session_id = data.session_id;
+                    showCaptcha(data.captcha_url);
+                } else {
+                    showAlert(data.error || 'Failed to initialize search', 'error');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // ==================== DISTRICT CAUSELIST FUNCTIONS ====================
+
+        async function loadDistrictCauseListStates() {
+            try {
+                // Initialize session first
+                const sessionResponse = await fetch('/api/district-causelist/init-session', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+                
+                const sessionData = await sessionResponse.json();
+                if (sessionData.success) {
+                    districtCauseListSessionId = sessionData.session_id;
+                    console.log('District causelist session initialized:', districtCauseListSessionId);
+                }
+                
+                const response = await fetch('/api/district-causelist/states');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const select = document.getElementById('dcl-state');
+                    select.innerHTML = '<option value="">Select State</option>';
+                    
+                    Object.keys(data.states).sort().forEach(stateName => {
+                        const option = document.createElement('option');
+                        option.value = data.states[stateName];
+                        option.textContent = stateName;
+                        option.dataset.name = stateName;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                showAlert('Failed to load states for district causelist', 'error');
+            }
+        }
+
+        async function onDCLStateChange() {
+            const select = document.getElementById('dcl-state');
+            const stateCode = select.value;
+            const stateName = select.options[select.selectedIndex]?.dataset?.name || '';
+            
+            if (!stateCode) return;
+            
+            showLoading();
+            
+            try {
+                const response = await fetch('/api/district-causelist/districts', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        state_code: stateCode,
+                        session_id: districtCauseListSessionId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const districtSelect = document.getElementById('dcl-district');
+                    districtSelect.innerHTML = '<option value="">Select District</option>';
+                    
+                    Object.entries(data.districts).forEach(([name, code]) => {
+                        const option = document.createElement('option');
+                        option.value = code;
+                        option.textContent = name;
+                        option.dataset.name = name;
+                        districtSelect.appendChild(option);
+                    });
+                    
+                    // Reset dependent dropdowns
+                    document.getElementById('dcl-court-complex').innerHTML = '<option value="">Select district first</option>';
+                    document.getElementById('dcl-establishment').innerHTML = '<option value="">Select court complex first</option>';
+                    document.getElementById('dcl-judge').innerHTML = '<option value="">Select establishment first</option>';
+                }
+            } catch (error) {
+                showAlert('Failed to load districts', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function onDCLDistrictChange() {
+            const stateSelect = document.getElementById('dcl-state');
+            const districtSelect = document.getElementById('dcl-district');
+            
+            const stateCode = stateSelect.value;
+            const districtCode = districtSelect.value;
+            
+            if (!stateCode || !districtCode) return;
+            
+            showLoading();
+            
+            try {
+                const response = await fetch('/api/district-causelist/court-complexes', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        state_code: stateCode,
+                        district_code: districtCode,
+                        session_id: districtCauseListSessionId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const complexSelect = document.getElementById('dcl-court-complex');
+                    complexSelect.innerHTML = '<option value="">Select Court Complex</option>';
+                    
+                    Object.entries(data.court_complexes).forEach(([name, code]) => {
+                        const option = document.createElement('option');
+                        option.value = code;
+                        option.textContent = name;
+                        option.dataset.name = name;
+                        complexSelect.appendChild(option);
+                    });
+                    
+                    // Reset dependent dropdowns
+                    document.getElementById('dcl-establishment').innerHTML = '<option value="">Select court complex first</option>';
+                    document.getElementById('dcl-judge').innerHTML = '<option value="">Select establishment first</option>';
+                }
+            } catch (error) {
+                showAlert('Failed to load court complexes', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function onDCLComplexChange() {
+            const stateSelect = document.getElementById('dcl-state');
+            const districtSelect = document.getElementById('dcl-district');
+            const complexSelect = document.getElementById('dcl-court-complex');
+            
+            const stateCode = stateSelect.value;
+            const districtCode = districtSelect.value;
+            const complexCode = complexSelect.value;
+            
+            if (!stateCode || !districtCode || !complexCode) return;
+            
+            showLoading();
+            
+            try {
+                const response = await fetch('/api/district-causelist/establishments', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        state_code: stateCode,
+                        district_code: districtCode,
+                        court_complex_code: complexCode,
+                        session_id: districtCauseListSessionId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                console.log('Establishments API response:', data);
+                
+                if (data.success) {
+                    const estSelect = document.getElementById('dcl-establishment');
+                    const judgeSelect = document.getElementById('dcl-judge');
+                    
+                    console.log('Establishments data:', data.establishments);
+                    
+                    // Check if establishments object is empty or has the special marker
+                    const hasEstablishments = data.establishments && Object.keys(data.establishments).length > 0;
+                    const hasNoEstablishmentMarker = data.establishments && data.establishments.__no_establishment__;
+                    
+                    // Check if establishment dropdown is needed
+                    if (hasNoEstablishmentMarker || !hasEstablishments) {
+                        console.log('No establishment dropdown needed, fetching judges directly');
+                        // Hide establishment dropdown, directly fetch judges
+                        estSelect.style.display = 'none';
+                        estSelect.parentElement.style.display = 'none';
+                        estSelect.value = '__no_establishment__';
+                        
+                        // Directly fetch judges
+                        await fetchJudgesForComplex(stateCode, districtCode, complexCode, '__no_establishment__');
+                    } else {
+                        console.log('Showing establishment dropdown with', Object.keys(data.establishments).length, 'options');
+                        // Show establishment dropdown
+                        estSelect.style.display = 'block';
+                        estSelect.parentElement.style.display = 'block';
+                        estSelect.innerHTML = '<option value="">Select Establishment</option>';
+                        
+                        Object.entries(data.establishments).forEach(([name, code]) => {
+                            const option = document.createElement('option');
+                            option.value = code;
+                            option.textContent = name;
+                            option.dataset.name = name;
+                            estSelect.appendChild(option);
+                        });
+                        
+                        // Reset judge dropdown
+                        judgeSelect.innerHTML = '<option value="">Select establishment first</option>';
+                    }
+                } else {
+                    console.error('API returned error:', data.error);
+                    showAlert('Error loading establishments: ' + (data.error || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                console.error('Exception loading establishments:', error);
+                showAlert('Failed to load establishments: ' + error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function fetchJudgesForComplex(stateCode, districtCode, complexCode, estCode) {
+            try {
+                const response = await fetch('/api/district-causelist/judges', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        state_code: stateCode,
+                        district_code: districtCode,
+                        court_complex_code: complexCode,
+                        est_code: estCode,
+                        session_id: districtCauseListSessionId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const judgeSelect = document.getElementById('dcl-judge');
+                    judgeSelect.innerHTML = '<option value="">Select Judge/Court</option>';
+                    
+                    // Backend returns {code: name}, so swap the order
+                    Object.entries(data.judges).forEach(([code, name]) => {
+                        const option = document.createElement('option');
+                        option.value = code;
+                        option.textContent = name;
+                        option.dataset.name = name;
+                        judgeSelect.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                showAlert('Failed to load judges', 'error');
+            }
+        }
+
+        async function onDCLEstablishmentChange() {
+            const stateSelect = document.getElementById('dcl-state');
+            const districtSelect = document.getElementById('dcl-district');
+            const complexSelect = document.getElementById('dcl-court-complex');
+            const estSelect = document.getElementById('dcl-establishment');
+            
+            const stateCode = stateSelect.value;
+            const districtCode = districtSelect.value;
+            const complexCode = complexSelect.value;
+            const estCode = estSelect.value;
+            
+            if (!stateCode || !districtCode || !complexCode || !estCode) return;
+            
+            showLoading();
+            
+            try {
+                const response = await fetch('/api/district-causelist/judges', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        state_code: stateCode,
+                        district_code: districtCode,
+                        court_complex_code: complexCode,
+                        est_code: estCode,
+                        session_id: districtCauseListSessionId
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const judgeSelect = document.getElementById('dcl-judge');
+                    judgeSelect.innerHTML = '<option value="">Select Judge/Court</option>';
+                    
+                    // Backend returns {code: name}, so swap the order
+                    Object.entries(data.judges).forEach(([code, name]) => {
+                        const option = document.createElement('option');
+                        option.value = code;
+                        option.textContent = name;
+                        option.dataset.name = name;
+                        judgeSelect.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                showAlert('Failed to load judges', 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function searchDistrictCauseList() {
+            const stateSelect = document.getElementById('dcl-state');
+            const districtSelect = document.getElementById('dcl-district');
+            const complexSelect = document.getElementById('dcl-court-complex');
+            const estSelect = document.getElementById('dcl-establishment');
+            const judgeSelect = document.getElementById('dcl-judge');
+            const dateInput = document.getElementById('dcl-date').value;
+            const caseType = document.getElementById('dcl-case-type').value;
+            const searchType = document.getElementById('dcl-search-type').value;
+            const searchTerm = document.getElementById('dcl-search-term').value.trim();
+            
+            // Check if establishment is hidden (optional)
+            const isEstablishmentHidden = estSelect.style.display === 'none';
+            
+            if (!stateSelect.value || !districtSelect.value || !complexSelect.value || 
+                !judgeSelect.value || !dateInput || !searchTerm) {
+                showAlert('Please fill all required fields', 'error');
+                return;
+            }
+            
+            // If establishment is visible, it must be selected
+            if (!isEstablishmentHidden && !estSelect.value) {
+                showAlert('Please select establishment', 'error');
+                return;
+            }
+            
+            // Convert date from YYYY-MM-DD to DD-MM-YYYY
+            const dateParts = dateInput.split('-');
+            const formattedDate = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`;
+            
+            showLoading();
+            
+            currentQueryData = {
+                state_code: stateSelect.value,
+                state_name: stateSelect.options[stateSelect.selectedIndex]?.dataset?.name || '',
+                district_code: districtSelect.value,
+                district_name: districtSelect.options[districtSelect.selectedIndex]?.textContent || '',
+                court_complex_code: complexSelect.value,
+                court_complex_name: complexSelect.options[complexSelect.selectedIndex]?.textContent || '',
+                est_code: estSelect.value || '__no_establishment__',
+                est_name: (estSelect.style.display === 'none') ? 'N/A' : (estSelect.options[estSelect.selectedIndex]?.textContent || ''),
+                court_no: judgeSelect.value,
+                court_name: judgeSelect.options[judgeSelect.selectedIndex]?.textContent || '',
+                date: formattedDate,
+                case_type: caseType,
+                search_term: searchTerm,
+                is_party_name: searchType === 'party_name',
+                dropdown_session_id: districtCauseListSessionId  // Pass the dropdown session
+            };
+            
+            try {
+                const response = await fetch('/api/district-causelist/search', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(currentQueryData)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentQueryData.query_id = data.query_id;
+                    currentQueryData.session_id = data.session_id;
+                    showCaptcha(data.captcha_url);
+                } else {
+                    showAlert(data.error || 'Failed to initialize search', 'error');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // ==================== END DISTRICT CAUSELIST FUNCTIONS ====================
+
 
         function showCaptcha(captchaUrl) {
             document.getElementById('captcha-image').src = captchaUrl;
@@ -755,32 +1368,91 @@
             showLoading();
             document.getElementById('captcha-modal').classList.add('hidden');
             
-            const endpoint = currentCourtType === 'high-court' 
-                ? '/api/high-court/verify-captcha'
-                : '/api/district-court/verify-captcha';
+            let endpoint;
+            if (currentCourtType === 'high-court') {
+                endpoint = '/api/high-court/verify-captcha';
+            } else if (currentCourtType === 'district-court') {
+                endpoint = '/api/district-court/verify-captcha';
+            } else if (currentCourtType === 'causelist') {
+                endpoint = '/api/causelist/verify-captcha';
+            } else if (currentCourtType === 'district-causelist') {
+                endpoint = '/api/district-causelist/verify-captcha';
+            }
             
             try {
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        ...currentQueryData,
-                        captcha: captcha
-                    })
-                });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    showAlert('Case found successfully!', 'success');
-                    displayResults(data.case_data);
+                // Special handling for causelist PDF processing with progress
+                if (currentCourtType === 'causelist') {
+                    showLoading('Analyzing cause list PDFs - Please wait, this may take a few minutes...');
+                    updateProgress(0, 100, 'Starting PDF analysis...');
+                    
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            ...currentQueryData,
+                            captcha: captcha
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        updateProgress(100, 100, `Completed! Found ${data.results.total_matches} matches in ${data.results.pdfs_with_matches} PDFs`);
+                        setTimeout(() => {
+                            showAlert('Search completed!', 'success');
+                            displayCauseListResults(data.results);
+                            hideLoading();
+                        }, 1000);
+                        return; // Don't hide loading yet
+                    } else {
+                        showAlert(data.error || 'Failed to fetch data', 'error');
+                    }
+                } else if (currentCourtType === 'district-causelist') {
+                    showLoading('Fetching and analyzing district cause list...');
+                    
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            ...currentQueryData,
+                            captcha: captcha
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        showAlert('Search completed!', 'success');
+                        displayDistrictCauseListResults(data.results);
+                    } else {
+                        showAlert(data.error || 'Failed to fetch data', 'error');
+                    }
                 } else {
-                    showAlert(data.error || 'Failed to fetch case', 'error');
+                    // Regular processing for other court types
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            ...currentQueryData,
+                            captcha: captcha
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        showAlert('Case found successfully!', 'success');
+                        displayResults(data.case_data);
+                    } else {
+                        showAlert(data.error || 'Failed to fetch data', 'error');
+                    }
                 }
             } catch (error) {
                 showAlert('Error: ' + error.message, 'error');
             } finally {
-                hideLoading();
+                if (currentCourtType !== 'causelist') {
+                    hideLoading();
+                }
             }
         }
 
@@ -1096,6 +1768,323 @@
             document.getElementById('results-container').classList.remove('hidden');
         }
 
+        function displayDistrictCauseListResults(results) {
+            const container = document.getElementById('results-content');
+            container.innerHTML = '';
+            
+            // Display search summary
+            const summaryCard = document.createElement('div');
+            summaryCard.className = 'result-card';
+            summaryCard.innerHTML = `
+                <h3>🔍 Search Summary</h3>
+                <div class="result-item">
+                    <div class="result-label">Court Name:</div>
+                    <div class="result-value">${results.court_name || 'N/A'}</div>
+                </div>
+                <div class="result-item">
+                    <div class="result-label">Date:</div>
+                    <div class="result-value">${results.date}</div>
+                </div>
+                <div class="result-item">
+                    <div class="result-label">Search Term:</div>
+                    <div class="result-value">${results.search_term}</div>
+                </div>
+                <div class="result-item">
+                    <div class="result-label">Search Type:</div>
+                    <div class="result-value">${results.search_type === 'party_name' ? 'Party Name' : 'Case Number'}</div>
+                </div>
+                <div class="result-item">
+                    <div class="result-label">Total Cases:</div>
+                    <div class="result-value">${results.total_cases || 0}</div>
+                </div>
+                <div class="result-item">
+                    <div class="result-label">Matches Found:</div>
+                    <div class="result-value">${results.match_count || 0}</div>
+                </div>
+            `;
+            container.appendChild(summaryCard);
+            
+            // Display message if no records or error
+            if (results.status === 'no_records') {
+                const noRecordCard = document.createElement('div');
+                noRecordCard.className = 'result-card';
+                noRecordCard.innerHTML = `
+                    <h3>ℹ️ No Records</h3>
+                    <p>${results.message || 'No cause list found for the selected date and court.'}</p>
+                `;
+                container.appendChild(noRecordCard);
+            } else if (results.status === 'error') {
+                const errorCard = document.createElement('div');
+                errorCard.className = 'result-card';
+                errorCard.innerHTML = `
+                    <h3>❌ Error</h3>
+                    <p>${results.message || 'Failed to fetch cause list.'}</p>
+                `;
+                container.appendChild(errorCard);
+            } else if (!results.matches || results.matches.length === 0) {
+                const noMatchCard = document.createElement('div');
+                noMatchCard.className = 'result-card';
+                noMatchCard.innerHTML = `
+                    <h3>ℹ️ No Matches Found</h3>
+                    <p>The search term was not found in the cause list for this date.</p>
+                `;
+                container.appendChild(noMatchCard);
+            } else {
+                // Display matching cases
+                results.matches.forEach((caseData, index) => {
+                    const caseCard = document.createElement('div');
+                    caseCard.className = 'result-card';
+                    caseCard.innerHTML = `
+                        <h3>📋 Match ${index + 1}</h3>
+                    `;
+                    
+                    // Display all fields from the case
+                    Object.entries(caseData).forEach(([key, value]) => {
+                        if (value && value !== '') {
+                            const item = document.createElement('div');
+                            item.className = 'result-item';
+                            item.innerHTML = `
+                                <div class="result-label">${key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:</div>
+                                <div class="result-value">${value}</div>
+                            `;
+                            caseCard.appendChild(item);
+                        }
+                    });
+                    
+                    container.appendChild(caseCard);
+                });
+            }
+            
+            // Display all cases from the cause list
+            if (results.all_cases && results.all_cases.length > 0) {
+                const allCasesHeader = document.createElement('div');
+                allCasesHeader.className = 'result-card';
+                allCasesHeader.innerHTML = `
+                    <h3>📋 Complete Cause List for ${results.date}</h3>
+                    <p>Showing all ${results.all_cases.length} cases listed for this date</p>
+                `;
+                container.appendChild(allCasesHeader);
+                
+                results.all_cases.forEach((caseData, index) => {
+                    const caseCard = document.createElement('div');
+                    caseCard.className = 'result-card';
+                    caseCard.style.cssText = 'background: #f9fafb; border-left: 3px solid #9ca3af;';
+                    caseCard.innerHTML = `
+                        <h4 style="margin-bottom: 10px;">Case ${index + 1}</h4>
+                    `;
+                    
+                    // Display all fields from the case
+                    Object.entries(caseData).forEach(([key, value]) => {
+                        if (value && value !== '') {
+                            const item = document.createElement('div');
+                            item.className = 'result-item';
+                            item.innerHTML = `
+                                <div class="result-label">${key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:</div>
+                                <div class="result-value">${value}</div>
+                            `;
+                            caseCard.appendChild(item);
+                        }
+                    });
+                    
+                    container.appendChild(caseCard);
+                });
+            }
+            
+            document.getElementById('results-container').classList.remove('hidden');
+        }
+
+        function displayCauseListResults(results) {
+            const container = document.getElementById('results-content');
+            container.innerHTML = '';
+            
+            // Store session_id for PDF downloads
+            if (results.session_id) {
+                causelistSessionId = results.session_id;
+                console.log('[INFO] Stored causelist session_id for PDF downloads:', causelistSessionId);
+            }
+            
+            // Display search summary
+            const summaryCard = document.createElement('div');
+            summaryCard.className = 'result-card';
+            summaryCard.innerHTML = `
+                <h3>🔍 Search Summary</h3>
+                <div class="result-item">
+                    <div class="result-label">Search Term:</div>
+                    <div class="result-value">${results.search_term}</div>
+                </div>
+                <div class="result-item">
+                    <div class="result-label">Search Type:</div>
+                    <div class="result-value">${results.search_type === 'party_name' ? 'Party Name' : 'Case Number'}</div>
+                </div>
+                <div class="result-item">
+                    <div class="result-label">Total PDFs Scanned:</div>
+                    <div class="result-value">${results.total_pdfs_scanned}</div>
+                </div>
+                <div class="result-item">
+                    <div class="result-label">PDFs with Matches:</div>
+                    <div class="result-value">${results.pdfs_with_matches}</div>
+                </div>
+                <div class="result-item">
+                    <div class="result-label">Total Matches Found:</div>
+                    <div class="result-value">${results.total_matches}</div>
+                </div>
+            `;
+            container.appendChild(summaryCard);
+            
+            // Display message if no matches
+            if (results.matching_pdfs.length === 0) {
+                const noMatchCard = document.createElement('div');
+                noMatchCard.className = 'result-card';
+                noMatchCard.innerHTML = `
+                    <h3>ℹ️ No Matches Found</h3>
+                    <p>${results.message || 'The search term was not found in any of the cause list PDFs for the selected date.'}</p>
+                `;
+                container.appendChild(noMatchCard);
+            } else {
+                // Display matching PDFs
+                results.matching_pdfs.forEach((pdf, index) => {
+                    const pdfCard = document.createElement('div');
+                    pdfCard.className = 'result-card';
+                    pdfCard.innerHTML = `
+                        <h3>📄 Match ${index + 1}: ${pdf.bench}</h3>
+                        <div class="result-item">
+                            <div class="result-label">SR No:</div>
+                            <div class="result-value">${pdf.sr_no}</div>
+                        </div>
+                        <div class="result-item">
+                            <div class="result-label">Type:</div>
+                            <div class="result-value">${pdf.type}</div>
+                        </div>
+                        <div class="result-item">
+                            <div class="result-label">Matches in PDF:</div>
+                            <div class="result-value">${pdf.match_count}</div>
+                        </div>
+                        <div style="margin-top: 15px;">
+                            <a href="${pdf.pdf_url}" target="_blank" 
+                               style="display: inline-block; padding: 10px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                                      color: white; text-decoration: none; border-radius: 8px; font-weight: bold;">
+                                📥 View Cause List PDF
+                            </a>
+                        </div>
+                    `;
+                    
+                    // Display matches
+                    if (pdf.matches && pdf.matches.length > 0) {
+                        const matchesDiv = document.createElement('div');
+                        matchesDiv.style.cssText = 'margin-top: 15px; padding: 15px; background: #f9fafb; border-radius: 8px;';
+                        matchesDiv.innerHTML = '<h4 style="margin-bottom: 10px; color: #667eea;">Case Details:</h4>';
+                        
+                        pdf.matches.forEach((match, matchIdx) => {
+                            const matchItem = document.createElement('div');
+                            matchItem.style.cssText = 'margin-bottom: 15px; padding: 10px; background: white; border-left: 3px solid #667eea;';
+                            matchItem.innerHTML = `
+                                <div style="margin-bottom: 5px;"><strong>Match #${matchIdx + 1}:</strong></div>
+                                <div style="margin-bottom: 5px;"><strong>Found at line:</strong> ${match.line_number}</div>
+                                <div style="margin-bottom: 5px;"><strong>Matched line:</strong> ${match.matched_line}</div>
+                                <div style="margin-top: 10px; padding: 10px; background: #f3f4f6; border-radius: 4px; white-space: pre-wrap; font-family: monospace; font-size: 12px;">
+                                    ${match.full_case_entry}
+                                </div>
+                            `;
+                            matchesDiv.appendChild(matchItem);
+                        });
+                        
+                        pdfCard.appendChild(matchesDiv);
+                    }
+                    
+                    container.appendChild(pdfCard);
+                });
+            }
+            
+            // Display all PDFs from the cause list
+            if (results.all_pdfs && results.all_pdfs.length > 0) {
+                const allPdfsHeader = document.createElement('div');
+                allPdfsHeader.className = 'result-card';
+                allPdfsHeader.innerHTML = `
+                    <h3>📋 Complete Cause List PDFs</h3>
+                    <p>All ${results.all_pdfs.length} cause list PDFs available for this date</p>
+                `;
+                container.appendChild(allPdfsHeader);
+                
+                results.all_pdfs.forEach((item, index) => {
+                    const pdfCard = document.createElement('div');
+                    pdfCard.className = 'result-card';
+                    pdfCard.style.cssText = 'background: #f9fafb; border-left: 3px solid #9ca3af;';
+                    pdfCard.innerHTML = `
+                        <h4 style="margin-bottom: 10px;">PDF ${index + 1}: ${item.bench}</h4>
+                        <div class="result-item">
+                            <div class="result-label">SR No:</div>
+                            <div class="result-value">${item.sr_no}</div>
+                        </div>
+                        <div class="result-item">
+                            <div class="result-label">Type:</div>
+                            <div class="result-value">${item.type}</div>
+                        </div>
+                        <div style="margin-top: 15px;">
+                            <button onclick="viewProxiedPDF('${item.pdf_link.replace(/'/g, "\\'")}', '${item.bench.replace(/'/g, "\\'")}')" 
+                               style="display: inline-block; padding: 10px 20px; background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%); 
+                                      color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">
+                                📥 View Cause List PDF
+                            </button>
+                        </div>
+                    `;
+                    container.appendChild(pdfCard);
+                });
+            }
+            
+            document.getElementById('results-container').classList.remove('hidden');
+        }
+        
+        async function viewProxiedPDF(pdfUrl, benchName) {
+            try {
+                showLoading('Fetching PDF from eCourts...');
+                
+                const requestBody = { 
+                    pdf_url: pdfUrl
+                };
+                
+                // Use causelist session if available (most important for HC causelist)
+                if (causelistSessionId) {
+                    requestBody.session_id = causelistSessionId;
+                    console.log('[INFO] Using causelist session:', causelistSessionId);
+                } else if (currentQueryData && currentQueryData.session_id) {
+                    // Fallback to other session types
+                    requestBody.session_id = currentQueryData.session_id;
+                    console.log('[INFO] Using query session:', currentQueryData.session_id);
+                }
+                
+                const response = await fetch('/api/proxy-pdf', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(requestBody)
+                });
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    
+                    // Check if it's actually a PDF
+                    if (blob.size < 1000) {
+                        hideLoading();
+                        showAlert('Downloaded file is too small - may not be a valid PDF', 'error');
+                        return;
+                    }
+                    
+                    const url = window.URL.createObjectURL(blob);
+                    window.open(url, '_blank');
+                    hideLoading();
+                    
+                    // Clean up the URL after a delay
+                    setTimeout(() => window.URL.revokeObjectURL(url), 60000);
+                } else {
+                    const error = await response.json();
+                    hideLoading();
+                    showAlert(error.error || 'Failed to fetch PDF from eCourts', 'error');
+                }
+            } catch (error) {
+                hideLoading();
+                showAlert('Error fetching PDF: ' + error.message, 'error');
+            }
+        }
+
         function showAlert(message, type) {
             const container = document.getElementById('alert-container');
             container.innerHTML = `
@@ -1109,12 +2098,47 @@
             }, 5000);
         }
 
-        function showLoading() {
+        function showLoading(message = 'Loading...') {
             document.getElementById('loading-indicator').classList.remove('hidden');
+            document.getElementById('loading-message').textContent = message;
+            document.getElementById('progress-container').style.display = 'none';
+            document.getElementById('progress-log').style.display = 'none';
+        }
+
+        function updateProgress(current, total, message = '') {
+            const progressContainer = document.getElementById('progress-container');
+            const progressBar = document.getElementById('progress-bar');
+            const progressText = document.getElementById('progress-text');
+            const progressLog = document.getElementById('progress-log');
+            
+            progressContainer.style.display = 'block';
+            progressLog.style.display = 'block';
+            
+            const percentage = total > 0 ? Math.round((current / total) * 100) : 0;
+            progressBar.style.width = percentage + '%';
+            progressText.textContent = `Processing ${current} of ${total} (${percentage}%)`;
+            
+            if (message) {
+                const logEntry = document.createElement('div');
+                logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+                logEntry.style.marginBottom = '3px';
+                progressLog.appendChild(logEntry);
+                
+                // Auto-scroll to bottom
+                progressLog.scrollTop = progressLog.scrollHeight;
+                
+                // Keep only last 20 entries
+                while (progressLog.children.length > 20) {
+                    progressLog.removeChild(progressLog.firstChild);
+                }
+            }
         }
 
         function hideLoading() {
             document.getElementById('loading-indicator').classList.add('hidden');
+            document.getElementById('progress-container').style.display = 'none';
+            document.getElementById('progress-log').style.display = 'none';
+            document.getElementById('progress-log').innerHTML = '';
         }
 
         function hideResults() {
