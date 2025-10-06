@@ -13,7 +13,20 @@ import glob
 import time
 from io import BytesIO
 
-app = Flask(__name__, static_folder='../frontend', template_folder='../frontend')
+# Resolve frontend directory reliably (works both locally and in container builds)
+frontend_candidate_1 = os.path.join(os.path.dirname(__file__), 'frontend')
+frontend_candidate_2 = os.path.join(os.path.dirname(__file__), '..', 'frontend')
+
+if os.path.isdir(frontend_candidate_1):
+    frontend_dir = frontend_candidate_1
+elif os.path.isdir(frontend_candidate_2):
+    frontend_dir = frontend_candidate_2
+else:
+    # Fallback to relative path; Flask will raise TemplateNotFound if wrong
+    frontend_dir = '../frontend'
+
+# Create Flask app with explicit absolute template/static folder path
+app = Flask(__name__, static_folder=frontend_dir, template_folder=frontend_dir)
 CORS(app)
 
 # Store active scraper sessions (session_id -> scraper instance)
