@@ -29,6 +29,7 @@ RUN pip install --upgrade pip setuptools wheel \
 
 # Copy application code
 COPY backend /app/backend
+COPY frontend /app/frontend
 
 # Pre-warm EasyOCR models (downloads model files during build)
 RUN python - <<'PY'
