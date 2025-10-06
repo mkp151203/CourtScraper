@@ -265,12 +265,14 @@ def search_high_court():
         active_sessions[session_id] = scraper
         
         captcha_url = captcha_result.get('captcha_url')
+        detected_text = captcha_result.get('detected_text', '')
         
         return jsonify({
             'success': True,
             'query_id': query_id,
             'session_id': session_id,
             'captcha_url': captcha_url,
+            'detected_text': detected_text,
             'message': 'Please solve the captcha'
         })
         
@@ -540,12 +542,14 @@ def search_district_court():
         active_sessions[session_id] = scraper
         
         captcha_url = captcha_result.get('captcha_url')
+        detected_text = captcha_result.get('detected_text', '')
         
         return jsonify({
             'success': True,
             'query_id': query_id,
             'session_id': session_id,
             'captcha_url': captcha_url,
+            'detected_text': detected_text,
             'message': 'Please solve the captcha'
         })
         
@@ -898,12 +902,14 @@ def search_causelist():
         active_sessions[session_id] = scraper
         
         captcha_url = captcha_result.get('captcha_url')
+        detected_text = captcha_result.get('detected_text', '')
         
         return jsonify({
             'success': True,
             'query_id': query_id,
             'session_id': session_id,
             'captcha_url': captcha_url,
+            'detected_text': detected_text,
             'message': 'Please solve the captcha'
         })
         
@@ -1231,12 +1237,14 @@ def search_district_causelist():
         active_sessions[session_id] = scraper
         
         captcha_url = captcha_result.get('captcha_url')
+        detected_text = captcha_result.get('detected_text', '')
         
         return jsonify({
             'success': True,
             'query_id': query_id,
             'session_id': session_id,
             'captcha_url': captcha_url,
+            'detected_text': detected_text,
             'message': 'Please solve the captcha'
         })
         

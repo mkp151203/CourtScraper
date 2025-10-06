@@ -7,6 +7,7 @@ import os
 import hashlib
 from datetime import datetime
 from typing import Dict, Optional
+from captcha_ocr import detect_captcha_text
 
 class DistrictCourtsScraper:
     """Simplified District Court scraper for web app"""
@@ -313,10 +314,15 @@ class DistrictCourtsScraper:
                             img_base64 = base64.b64encode(captcha_response.content).decode('utf-8')
                             captcha_data_url = f"data:image/png;base64,{img_base64}"
                             
+                            # Attempt to auto-detect captcha text using OCR
+                            detected_text = detect_captcha_text(captcha_response.content)
+                            print(f"[OCR] Auto-detected CAPTCHA text: '{detected_text}'")
+                            
                             # Return dict format expected by web app
                             return {
                                 'captcha_url': captcha_data_url,
-                                'app_token': self.app_token
+                                'app_token': self.app_token,
+                                'detected_text': detected_text  # Auto-detected text for auto-fill
                             }
             
             print("Failed to fetch captcha")

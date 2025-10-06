@@ -6,6 +6,7 @@ import base64
 import io
 from typing import Dict, Optional, List
 from PIL import Image
+from captcha_ocr import detect_captcha_text
 
 class HCServicesCompleteScraper:
     """Simplified High Court scraper for web app"""
@@ -173,9 +174,14 @@ class HCServicesCompleteScraper:
                 img_base64 = base64.b64encode(response.content).decode('utf-8')
                 captcha_data_url = f"data:image/png;base64,{img_base64}"
                 
+                # Attempt to auto-detect captcha text using OCR
+                detected_text = detect_captcha_text(response.content)
+                print(f"[OCR] Auto-detected CAPTCHA text: '{detected_text}'")
+                
                 return {
                     'captcha_url': captcha_data_url,
-                    'captcha_image': response.content
+                    'captcha_image': response.content,
+                    'detected_text': detected_text  # Auto-detected text for auto-fill
                 }
             return None
         except Exception as e:

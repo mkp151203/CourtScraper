@@ -13,6 +13,7 @@ import re
 import time
 from typing import Dict, Optional, List
 from datetime import datetime
+from captcha_ocr import detect_captcha_text
 
 
 class DistrictCauseListScraper:
@@ -391,8 +392,15 @@ class DistrictCauseListScraper:
                 img_base64 = base64.b64encode(response.content).decode('utf-8')
                 captcha_url = f"data:image/png;base64,{img_base64}"
                 
+                # Attempt to auto-detect captcha text using OCR
+                detected_text = detect_captcha_text(response.content)
+                print(f"[OCR] Auto-detected CAPTCHA text: '{detected_text}'")
+                
                 print(f"[SUCCESS] CAPTCHA fetched successfully")
-                return {'captcha_url': captcha_url}
+                return {
+                    'captcha_url': captcha_url,
+                    'detected_text': detected_text
+                }
             
             return None
         except Exception as e:

@@ -15,6 +15,9 @@ Pillow==10.1.0
 # PDF Processing
 PyPDF2==3.0.1
 
+# OCR for CAPTCHA
+easyocr==1.7.1
+
 # Package Management
 pip
 setuptools
