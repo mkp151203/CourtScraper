@@ -870,7 +870,7 @@
                 if (data.success) {
                     currentQueryData.query_id = data.query_id;
                     currentQueryData.session_id = data.session_id; // Store session ID
-                    showCaptcha(data.captcha_url);
+                    showCaptcha(data.captcha_url, data.detected_text || '');
                 } else {
                     showAlert(data.error || 'Failed to search', 'error');
                 }
@@ -920,7 +920,7 @@
                 if (data.success) {
                     currentQueryData.query_id = data.query_id;
                     currentQueryData.session_id = data.session_id; // Store session ID
-                    showCaptcha(data.captcha_url);
+                    showCaptcha(data.captcha_url, data.detected_text || '');
                 } else {
                     showAlert(data.error || 'Failed to search', 'error');
                 }
@@ -973,7 +973,7 @@
                 if (data.success) {
                     currentQueryData.query_id = data.query_id;
                     currentQueryData.session_id = data.session_id;
-                    showCaptcha(data.captcha_url);
+                    showCaptcha(data.captcha_url, data.detected_text || '');
                 } else {
                     showAlert(data.error || 'Failed to initialize search', 'error');
                 }
@@ -1337,7 +1337,7 @@
                 if (data.success) {
                     currentQueryData.query_id = data.query_id;
                     currentQueryData.session_id = data.session_id;
-                    showCaptcha(data.captcha_url);
+                    showCaptcha(data.captcha_url, data.detected_text || '');
                 } else {
                     showAlert(data.error || 'Failed to initialize search', 'error');
                 }
@@ -1351,10 +1351,35 @@
         // ==================== END DISTRICT CAUSELIST FUNCTIONS ====================
 
 
-        function showCaptcha(captchaUrl) {
+        function showCaptcha(captchaUrl, detectedText = '') {
             document.getElementById('captcha-image').src = captchaUrl;
-            document.getElementById('captcha-input').value = '';
+            
+            // Auto-fill captcha input with detected text
+            const captchaInput = document.getElementById('captcha-input');
+            captchaInput.value = detectedText;
+            
             document.getElementById('captcha-modal').classList.remove('hidden');
+            
+            // Show message to user if text was auto-detected
+            if (detectedText) {
+                // Add a small delay to ensure modal is visible
+                setTimeout(() => {
+                    // Create or update verification message
+                    let verifyMsg = document.getElementById('captcha-verify-msg');
+                    if (!verifyMsg) {
+                        verifyMsg = document.createElement('p');
+                        verifyMsg.id = 'captcha-verify-msg';
+                        verifyMsg.style.cssText = 'margin-top: 10px; padding: 10px; background: #e3f2fd; border-left: 4px solid #2196f3; color: #1976d2; font-size: 14px; border-radius: 4px;';
+                        const inputGroup = captchaInput.parentElement;
+                        inputGroup.appendChild(verifyMsg);
+                    }
+                    verifyMsg.innerHTML = `✓ CAPTCHA auto-detected as "<strong>${detectedText}</strong>". Please verify it matches the image above and click Submit.`;
+                    
+                    // Focus on the input so user can easily edit if needed
+                    captchaInput.focus();
+                    captchaInput.select();
+                }, 100);
+            }
         }
 
         async function submitCaptcha() {
