@@ -24,7 +24,7 @@ COPY backend/requirements.txt /app/backend/requirements.txt
 # Upgrade pip and install CPU-only PyTorch wheel first,
 # then install the rest of the requirements (including easyocr)
 RUN pip install --upgrade pip setuptools wheel \
- && pip install --no-cache-dir torch==2.2.0+cpu torchvision==0.15.2+cpu -f https://download.pytorch.org/whl/cpu/torch_stable.html \
+ && pip install --no-cache-dir torch==2.2.0+cpu torchvision==0.17.0+cpu -f https://download.pytorch.org/whl/cpu/torch_stable.html \
  && pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
@@ -33,13 +33,11 @@ COPY backend /app/backend
 # Pre-warm EasyOCR models (downloads model files during build)
 RUN python - <<'PY'
 import easyocr
-# initialize reader (gpu=False) to force model download into image
 easyocr.Reader(['en'], gpu=False)
-print("EasyOCR models cached")
+print("✅ EasyOCR models cached")
 PY
 
 ENV PYTHONUNBUFFERED=1
 EXPOSE 5000
 
-# Use your preferred run command; keep same as before or use gunicorn for production
 CMD ["python", "app.py"]
